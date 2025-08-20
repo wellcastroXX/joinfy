@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:joinfy/theme/app_theme.dart';
 
 // Páginas (ajuste os caminhos conforme o seu projeto)
-import 'package:joinfy/source/modules/auth/register/register_page.dart';
-import 'package:joinfy/source/modules/auth/login/login_page.dart'; 
+import 'package:joinfy/source/modules/pages/auth/register/register_page.dart';
+import 'package:joinfy/source/modules/pages/auth/login/login_page.dart'; 
+import 'package:joinfy/source/modules/pages/home/home_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -37,6 +38,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (_) => const LoginPage(), // <— REGISTRADA
         '/register': (_) => const RegisterPage(),
+        '/home_page': (_) => const HomePage(), 
       },
 
       // (opcional) fallback para evitar crash em rota desconhecida

@@ -247,7 +247,7 @@ class _LoginPageState extends State<LoginPage> {
                                   onPressed: _loading
                                       ? null
                                       : () => Navigator.pushNamed(
-                                          context, '/register'),
+                                          context, '/home_page'),
                                   fullWidth: false,
                                   trailing: Image.asset(
                                     'assets/icons/arrow_circle.png',
