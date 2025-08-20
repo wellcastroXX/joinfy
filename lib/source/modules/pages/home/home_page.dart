@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../components/map/map.dart';
+
 /// HomePage
 /// - Fundo: preto (placeholder para o Mapa futuramente)
 /// - Topo: botão redondo de Menu (esq.) e Pesquisa (dir.) com ícone laranja #FF5800
@@ -28,8 +30,7 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // TODO: Substituir por widget de mapa (GoogleMap/Mapbox) futuramente
-          const _PlaceholderBackground(),
+          const MapBackground(),
 
           // Camada de UI sobre o mapa
           SafeArea(
@@ -382,11 +383,11 @@ class _MenuTile extends StatelessWidget {
 }
 
 /// Placeholder para o fundo (depois vira o widget do mapa)
-class _PlaceholderBackground extends StatelessWidget {
-  const _PlaceholderBackground();
+class MapBackground extends StatelessWidget {
+  const MapBackground({super.key});
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(color: Colors.black);
+    return const MapaPage();
   }
 }
 
