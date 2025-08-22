@@ -1,10 +1,12 @@
 // lib/modules/auth/presentation/pages/register_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:joinfy/capitalize_words_formatter.dart';
 import 'package:joinfy/theme/text_styles.dart';
 import 'package:joinfy/theme/colors.dart';
 import 'package:joinfy/ui/widgets/app_buttons.dart';
+import 'package:joinfy/services/auth_service.dart';
 
 const String kEyeOpenPng = 'assets/icons/eye_open.png';
 const String kEyeClosedPng = 'assets/icons/eye_close.png';
@@ -64,18 +66,80 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
+  void _showError(Object e) {
+    String msg = 'Ocorreu um erro. Tente novamente.';
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'email-already-in-use':
+          msg = 'Este e-mail já está em uso.';
+          break;
+        case 'invalid-email':
+          msg = 'E-mail inválido.';
+          break;
+        case 'weak-password':
+          msg = 'Senha fraca (mínimo 6 caracteres).';
+          break;
+        case 'operation-not-allowed':
+          msg = 'Provedor não habilitado no Firebase.';
+          break;
+        default:
+          msg = e.message ?? msg;
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _onSubmit() async {
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
 
     setState(() => _loading = true);
+    try {
+      await AuthService.instance.signUpWithEmail(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-    await Future.delayed(const Duration(milliseconds: 800)); // mock
-    if (!mounted) return;
-    setState(() => _loading = false);
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Cadastro enviado! (mock)')),
+  Future<void> _signInWithFacebook() async {
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.signInWithFacebook();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  TextStyle _fieldStyle(BuildContext context) {
+    return AppTextStyles.bodyLC.copyWith(
+      fontSize: 16,
+      color: AppColors.textPrimary,
+      // fontFamily: 'CodeProLC', // só coloca se quiser forçar a família
     );
   }
 
@@ -102,7 +166,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     const spacing = 25.0;
 
-    // mesmo estilo usado na LoginPage para os botões sociais
     final socialTextStyle = AppTextStyles.headingLC
         .copyWith(fontSize: 16, fontWeight: FontWeight.w500);
 
@@ -141,7 +204,6 @@ class _RegisterPageState extends State<RegisterPage> {
         absorbing: _loading,
         child: Column(
           children: [
-            /// conteúdo rolável
             Expanded(
               child: SingleChildScrollView(
                 padding:
@@ -163,10 +225,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                 width: 18, height: 18),
                           ),
                         ),
+                        style: _fieldStyle(context),
                         validator: _validateName,
                       ),
                       const SizedBox(height: spacing),
                       TextFormField(
+                        style: _fieldStyle(context),
                         controller: _emailCtrl,
                         textInputAction: TextInputAction.next,
                         keyboardType: TextInputType.emailAddress,
@@ -183,6 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: spacing),
                       TextFormField(
+                        style: _fieldStyle(context),
                         controller: _passwordCtrl,
                         textInputAction: TextInputAction.next,
                         obscureText: _obscurePass,
@@ -212,6 +277,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: spacing),
                       TextFormField(
+                        style: _fieldStyle(context),
                         controller: _confirmCtrl,
                         textInputAction: TextInputAction.done,
                         obscureText: _obscureConfirm,
@@ -242,7 +308,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: spacing * 1.5),
 
-                      /// Botão principal responsivo
                       FractionallySizedBox(
                         widthFactor: appButtonWidthFactor(context),
                         child: AppPrimaryButton(
@@ -260,12 +325,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const AppOrTextDivider(verticalMargin: 25),
 
-                      /// Botão alternativo — Google (80% de largura + altura maior)
+                      // Google
                       FractionallySizedBox(
                         widthFactor: 0.80,
                         child: AppAltButton(
                           label: 'Login com Google',
-                          onPressed: _loading ? null : () {},
+                          onPressed: _loading ? null : _signInWithGoogle,
                           fullWidth: false,
                           leading: Image.asset('assets/icons/google_icon.png',
                               width: 35, height: 35),
@@ -285,15 +350,18 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 10),
 
-                      /// Botão alternativo — Facebook (80% de largura + altura maior)
+                      // Facebook
                       FractionallySizedBox(
                         widthFactor: 0.80,
                         child: AppAltButton(
                           label: 'Login com Facebook',
-                          onPressed: _loading ? null : () {},
+                          onPressed: _loading ? null : _signInWithFacebook,
                           fullWidth: false,
-                          leading: Image.asset('assets/icons/facebook_icon.png',
-                              width: 35, height: 35),
+                          leading: Image.asset(
+                            'assets/icons/facebook_icon.png',
+                            width: 35,
+                            height: 35,
+                          ),
                           pinLeading: true,
                           reservedLeadingWidth: 52,
                           textStyleOverride: socialTextStyle,
@@ -318,12 +386,11 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
 
-            /// Rodapé com fonte responsiva
+            // Rodapé
             SafeArea(
               top: false,
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  // 4% da largura, limitado entre 14 e 18
                   final base = MediaQuery.of(context).size.width * 0.035;
                   final fontSize = base.clamp(14.0, 18.0);
 

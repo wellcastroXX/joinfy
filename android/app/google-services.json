@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "869222643655",
+    "project_id": "joinfy-d73f0",
+    "storage_bucket": "joinfy-d73f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:869222643655:android:c9f16989b8c41b50604be2",
+        "android_client_info": {
+          "package_name": "com.example.joinfy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "869222643655-7pbkfjcrsvapp1fn3i980adg106uk6uk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.joinfy",
+            "certificate_hash": "96ded534a6cfa00a33110d3a963984de37729bf4"
+          }
+        },
+        {
+          "client_id": "869222643655-mlomrb013b90dovmk3h4nj3n4k1e1ctj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8B9YGwctsdrLYM4Z1KlFgis-VB5TCSsY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "869222643655-mlomrb013b90dovmk3h4nj3n4k1e1ctj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

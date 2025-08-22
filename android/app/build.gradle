@@ -4,6 +4,8 @@ plugins {
     id "org.jetbrains.kotlin.android"
     // o plugin do Flutter deve vir depois do Android e Kotlin
     id "dev.flutter.flutter-gradle-plugin"
+
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -24,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.joinfy"
-        minSdk flutter.minSdkVersion
+        minSdk 23
         targetSdk flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

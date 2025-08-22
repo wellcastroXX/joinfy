@@ -1,8 +1,11 @@
+// lib/source/modules/pages/auth/login/login_page.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:joinfy/theme/text_styles.dart';
 import 'package:joinfy/theme/colors.dart';
 import 'package:joinfy/ui/widgets/app_buttons.dart';
+import 'package:joinfy/services/auth_service.dart';
 
 const String kEyeOpenPng = 'assets/icons/eye_open.png';
 const String kEyeClosedPng = 'assets/icons/eye_close.png';
@@ -48,20 +51,85 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
+  void _showError(Object e) {
+    String msg = 'Erro ao entrar. Tente novamente.';
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'wrong-password':
+          msg = 'Credenciais inválidas. Verifique e-mail e senha.';
+          break;
+        case 'user-not-found':
+          msg = 'Usuário não encontrado.';
+          break;
+        case 'invalid-email':
+          msg = 'E-mail inválido.';
+          break;
+        case 'user-disabled':
+          msg = 'Usuário desativado.';
+          break;
+        case 'operation-not-allowed':
+          msg = 'Provedor não habilitado no Firebase.';
+          break;
+        default:
+          msg = e.message ?? msg;
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _onSubmit() async {
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
 
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800)); // mock
-    if (!mounted) return;
-    setState(() => _loading = false);
+    try {
+      await AuthService.instance.signInWithEmail(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text.trim(),
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            'Login enviado! Lembrar-se: ${_rememberMe ? "sim" : "não"} (mock)'),
-      ),
+      if (!mounted) return;
+      // lembrete: o AuthGate já redireciona se preferir. Aqui garantimos navegação:
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithFacebook() async {
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.signInWithFacebook();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_page');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  TextStyle _fieldStyle(BuildContext context) {
+    return AppTextStyles.bodyLC.copyWith(
+      fontSize: 16,
+      color: AppColors.textPrimary,
+      // fontFamily: 'CodeProLC', // só coloca se quiser forçar a família
     );
   }
 
@@ -117,7 +185,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // LOGO responsiva quase colada no topo
+                        // LOGO
                         Padding(
                           padding: EdgeInsets.only(top: topPad),
                           child: Center(
@@ -133,7 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                               .clamp(16.0, 40.0),
                         ),
 
-                        // TÍTULO "Entrar"
+                        // TÍTULO
                         Text(
                           'Entrar',
                           style: AppTextStyles.headingLC.copyWith(fontSize: 30),
@@ -143,6 +211,10 @@ class _LoginPageState extends State<LoginPage> {
                         // E-mail
                         TextFormField(
                           controller: _emailCtrl,
+                          style: _fieldStyle(context).copyWith(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
                           textInputAction: TextInputAction.next,
                           keyboardType: TextInputType.emailAddress,
                           autofillHints: const [AutofillHints.email],
@@ -160,6 +232,10 @@ class _LoginPageState extends State<LoginPage> {
 
                         // Senha
                         TextFormField(
+                          style: _fieldStyle(context).copyWith(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
                           controller: _passwordCtrl,
                           textInputAction: TextInputAction.done,
                           obscureText: _obscurePass,
@@ -189,7 +265,6 @@ class _LoginPageState extends State<LoginPage> {
                           onFieldSubmitted: (_) => _onSubmit(),
                         ),
 
-                        // lembrar-se + esqueceu a senha?
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -227,7 +302,6 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
 
-                        // Espaço elástico
                         SizedBox(
                           height: math.max(
                             12.0,
@@ -235,7 +309,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
 
-                        // --- BLOCO DE BOTÕES CENTRALIZADO ---
+                        // --- BOTÕES ---
                         Center(
                           child: Column(
                             children: [
@@ -243,29 +317,38 @@ class _LoginPageState extends State<LoginPage> {
                                 alignment: Alignment.center,
                                 widthFactor: appButtonWidthFactor(context),
                                 child: AppPrimaryButton(
-                                  label: 'INSCREVA-SE',
-                                  onPressed: _loading
-                                      ? null
-                                      : () => Navigator.pushNamed(
-                                          context, '/home_page'),
+                                  label: _loading ? '' : 'ENTRAR',
+                                  onPressed: _loading ? null : _onSubmit,
                                   fullWidth: false,
-                                  trailing: Image.asset(
-                                    'assets/icons/arrow_circle.png',
-                                    width: 50,
-                                    height: 50,
-                                    fit: BoxFit.contain,
-                                  ),
+                                  trailing: _loading
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          'assets/icons/arrow_circle.png',
+                                          width: 50,
+                                          height: 50,
+                                          fit: BoxFit.contain,
+                                        ),
                                 ),
                               ),
                               const AppOrTextDivider(verticalMargin: 25),
 
-                              // Login com Google — largura 80% e ALTURA personalizada
+                              // Google
                               FractionallySizedBox(
                                 alignment: Alignment.center,
                                 widthFactor: 0.80,
                                 child: AppAltButton(
                                   label: 'Login com Google',
-                                  onPressed: _loading ? null : () {},
+                                  onPressed:
+                                      _loading ? null : _signInWithGoogle,
                                   fullWidth: false,
                                   leading: Image.asset(
                                     'assets/icons/google_icon.png',
@@ -275,7 +358,6 @@ class _LoginPageState extends State<LoginPage> {
                                   pinLeading: true,
                                   reservedLeadingWidth: 52,
                                   textStyleOverride: socialTextStyle,
-                                  // ⬇ altura só aqui:
                                   style: appAltButtonStyle(context).copyWith(
                                     minimumSize: MaterialStateProperty.all(
                                       const Size.fromHeight(64),
@@ -289,13 +371,14 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: 15),
 
-                              // Login com Facebook — largura 80% e ALTURA personalizada
+                              // Facebook
                               FractionallySizedBox(
                                 alignment: Alignment.center,
                                 widthFactor: 0.80,
                                 child: AppAltButton(
                                   label: 'Login com Facebook',
-                                  onPressed: _loading ? null : () {},
+                                  onPressed:
+                                      _loading ? null : _signInWithFacebook,
                                   fullWidth: false,
                                   leading: Image.asset(
                                     'assets/icons/facebook_icon.png',
@@ -305,7 +388,6 @@ class _LoginPageState extends State<LoginPage> {
                                   pinLeading: true,
                                   reservedLeadingWidth: 52,
                                   textStyleOverride: socialTextStyle,
-                                  // ⬇ altura só aqui:
                                   style: appAltButtonStyle(context).copyWith(
                                     minimumSize: MaterialStateProperty.all(
                                       const Size.fromHeight(64),
@@ -330,7 +412,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
 
-              // Rodapé CENTRALIZADO
+              // Rodapé
               SafeArea(
                 top: false,
                 child: Center(

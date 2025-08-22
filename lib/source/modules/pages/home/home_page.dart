@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-
+import 'package:joinfy/source/modules/pages/auth/login/login_page.dart';
 import '../../../components/map/map.dart';
+import 'package:joinfy/utils/string_utils.dart';
+
+// Imports Firebase (assumindo que você já tem no projeto)
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// HomePage
 /// - Fundo: preto (placeholder para o Mapa futuramente)
@@ -26,7 +31,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: const _SideMenu(), // menu lateral (versão branca)
+      drawer: _SideMenu(), // <<-- removido const porque virou StatefulWidget
       backgroundColor: Colors.black,
       body: Stack(
         children: [
@@ -46,7 +51,8 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => _scaffoldKey.currentState?.openDrawer(),
                     tooltip: 'Abrir menu',
                     bgColor: Colors.white,
-                    iconColor: const Color(0xFFFF5800),
+                    size: 56,
+                    iconSize: 28,
                   ),
                 ),
 
@@ -63,7 +69,8 @@ class _HomePageState extends State<HomePage> {
                     },
                     tooltip: 'Pesquisar',
                     bgColor: Colors.white,
-                    iconColor: const Color(0xFFFF5800),
+                    size: 56,
+                    iconSize: 28,
                   ),
                 ),
 
@@ -96,193 +103,286 @@ class _HomePageState extends State<HomePage> {
 /// Botão redondo padrão
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
   final String? tooltip;
   final Color bgColor;
   final Color iconColor;
 
+  /// diâmetro total do botão (largura = altura)
+  final double size;
+
+  /// tamanho do ícone dentro do botão
+  final double iconSize;
+
   const _RoundIconButton({
     required this.icon,
-    this.onTap,
+    required this.onTap,
     this.tooltip,
     this.bgColor = Colors.white,
-    this.iconColor = const Color(0xFF000080),
+    this.iconColor = const Color(0xFFFF5800),
+    this.size = 48, // padrão
+    this.iconSize = 24, // padrão
+    super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final child = Material(
       color: bgColor,
       shape: const CircleBorder(),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.3),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
+        customBorder: const CircleBorder(),
         onTap: onTap,
-        child: Tooltip(
-          message: tooltip ?? '',
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: Center(
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: Icon(icon, size: iconSize, color: iconColor),
           ),
         ),
       ),
     );
+
+    return tooltip != null ? Tooltip(message: tooltip!, child: child) : child;
   }
 }
 
 /// ======================
-/// Side Menu (branco, estilo do print)
+/// Side Menu (branco) — agora Stateful para carregar nome do banco
 /// ======================
-class _SideMenu extends StatelessWidget {
+class _SideMenu extends StatefulWidget {
   const _SideMenu({
     this.onSelect,
     this.avatarAsset,
-    this.userName = 'João Smith',
     this.notificationsCount = 0,
   });
 
   final ValueChanged<String>? onSelect;
   final String? avatarAsset;
-  final String userName;
   final int notificationsCount;
 
+  @override
+  State<_SideMenu> createState() => _SideMenuState();
+}
+
+class _SideMenuState extends State<_SideMenu> {
   static const Color _brandBlue = Color(0xFF000080);
   static const Color _brandOrange = Color(0xFFFF5800);
 
+  String? _userName; // nome pronto para exibir (primeiro + último)
+  bool _loadingName = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    String display = 'Usuário';
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final doc =
+            await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+        if (doc.exists) {
+          // tenta vários campos comuns: 'nome', 'name', 'fullName'
+          final raw = (doc.data()?['nome'] ??
+                  doc.data()?['name'] ??
+                  doc.data()?['fullName'] ??
+                  '')
+              .toString()
+              .trim();
+
+          if (raw.isNotEmpty) {
+            display = formatName(raw); // usa seu util para 1º + último
+          } else {
+            // fallback: tenta exibir parte local do e-mail
+            final email = FirebaseAuth.instance.currentUser?.email ?? '';
+            if (email.isNotEmpty) {
+              final local = email.split('@').first;
+              display = formatName(local.replaceAll('.', ' '));
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // mantém 'Usuário' se der erro
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _userName = display;
+      _loadingName = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    // 78% da tela, com limites (mín 360, máx 95%)
+    final double drawerWidth = (w * 0.78).clamp(360.0, w * 0.95);
+
     return Drawer(
+      width: drawerWidth,
       backgroundColor: Colors.transparent,
       elevation: 0,
-      child: SafeArea(
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            width: 320,
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 150),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 14,
-                  offset: const Offset(0, 8),
+      // Sem SafeArea: ocupa toda a altura do Drawer, inclusive sob a status bar
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+          padding: const EdgeInsets.fromLTRB(30, 40, 30, 0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // 1) Botão Fechar fixo no topo
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  tooltip: 'Fechar',
+                  icon: const Icon(Icons.close, color: Colors.black54),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    tooltip: 'Fechar',
-                    icon: const Icon(Icons.close, color: Colors.black54),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
+              ),
 
-                // Avatar centralizado
-                Container(
-                  width: 112,
-                  height: 112,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFFEFEFEF),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: avatarAsset != null
-                      ? Image.asset(
-                          avatarAsset!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.person,
-                            size: 48,
-                            color: Colors.black45,
+              // 2) Conteúdo que deve "descer": avatar, nome, itens e botão Sair
+              Expanded(
+                child: SingleChildScrollView(
+                  // evita overflow em telas menores
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 50), // ajuste a altura
+                    child: Column(
+                      children: [
+                        // Avatar
+                        Container(
+                          width: 180,
+                          height: 180,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFFEFEFEF),
                           ),
-                        )
-                      : const Icon(Icons.person,
-                          size: 48, color: Colors.black45),
-                ),
-                const SizedBox(height: 12),
+                          clipBehavior: Clip.antiAlias,
+                          child: widget.avatarAsset != null
+                              ? Image.asset(
+                                  widget.avatarAsset!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: Colors.black45,
+                                  ),
+                                )
+                              : const Icon(Icons.person,
+                                  size: 48, color: Colors.black45),
+                        ),
+                        const SizedBox(height: 20),
 
-                // Nome centralizado
-                Text(
-                  userName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: _brandBlue,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    fontFamily: 'CodeProLC', // remova se não estiver usando
+                        // Nome
+                        Text(
+                          _loadingName
+                              ? 'Carregando...'
+                              : (_userName ?? 'Usuário'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: _brandBlue,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 22,
+                            fontFamily: 'CodeProLC',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 40, bottom: 70), // Itens
+                          child: Column(
+                            children: [
+                              _MenuTile(
+                                icon: Icons.history,
+                                label: 'Histórico de Pedidos',
+                                onTap: () => _tap(context, 'historico'),
+                              ),
+                              _MenuTile(
+                                icon: Icons.notifications_none_rounded,
+                                label: 'Notificações',
+                                badge: widget.notificationsCount,
+                                badgeColor: _brandOrange,
+                                onTap: () => _tap(context, 'notificacoes'),
+                              ),
+                              _MenuTile(
+                                icon: Icons.local_offer_outlined,
+                                label: 'Promoções',
+                                onTap: () => _tap(context, 'promocoes'),
+                              ),
+                              _MenuTile(
+                                icon: Icons.attach_money,
+                                label: 'Indique & Ganhe',
+                                onTap: () => _tap(context, 'indique'),
+                              ),
+                              _MenuTile(
+                                icon: Icons.settings_outlined,
+                                label: 'Configurações',
+                                onTap: () => _tap(context, 'configuracoes'),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Empurra o botão "Sair" pro final do scroll
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: 160,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                    builder: (_) => const LoginPage()),
+                                (route) => false, // limpa todo o histórico
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              backgroundColor: _brandOrange,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(20),
+                              shape: const StadiumBorder(),
+                              elevation: 2,
+                            ),
+                            child: const Text(
+                              'Sair',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                fontFamily: 'CodeProLC',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // Itens do menu (como no print)
-                _MenuTile(
-                  icon: Icons.history,
-                  label: 'Histórico de Pedidos',
-                  onTap: () => _tap(context, 'historico'),
-                ),
-                _MenuTile(
-                  icon: Icons.notifications_none_rounded,
-                  label: 'Notificações',
-                  badge: notificationsCount,
-                  badgeColor: _brandOrange,
-                  onTap: () => _tap(context, 'notificacoes'),
-                ),
-                _MenuTile(
-                  icon: Icons.local_offer_outlined,
-                  label: 'Promoções',
-                  onTap: () => _tap(context, 'promocoes'),
-                ),
-                _MenuTile(
-                  icon: Icons.group_add_outlined,
-                  label: 'Indique & Ganhe',
-                  onTap: () => _tap(context, 'indique'),
-                ),
-                _MenuTile(
-                  icon: Icons.settings_outlined,
-                  label: 'Configurações',
-                  onTap: () => _tap(context, 'configuracoes'),
-                ),
-
-                const Spacer(),
-
-                // Botão Sair (pill laranja)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      onSelect?.call('sair');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _brandOrange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(44),
-                      shape: const StadiumBorder(),
-                      elevation: 2,
-                    ),
-                    child: const Text(
-                      'Sair',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        fontFamily: 'CodeProLC',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -291,7 +391,7 @@ class _SideMenu extends StatelessWidget {
 
   void _tap(BuildContext context, String key) {
     Navigator.of(context).pop();
-    onSelect?.call(key);
+    widget.onSelect?.call(key);
   }
 }
 
@@ -368,9 +468,9 @@ class _MenuTile extends StatelessWidget {
               child: Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF000000),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
                   fontFamily: 'CodeProLC', // remova se não usar
                 ),
               ),
